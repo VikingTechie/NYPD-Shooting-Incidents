@@ -1,0 +1,79 @@
+---
+title: "NYPD Shooting Incidents"
+output:
+  pdf_document: default
+  html_document: default
+---
+## Step 1 Start Document
+Start an Rmd document that describes and imports the shooting project dataset in a reproducible manner.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+library(tidyverse)
+
+nypd_url = "https://data.cityofnewyork.us/api/v3/views/833y-fsy8/export.csv?accessType=DOWNLOAD"
+nypd_data = read_csv(nypd_url)
+```
+
+```{r setup-folder}
+if(!file.exists("Data")){dir.create("Data")}
+```
+
+## Step 2 Tidy and Transform, Question of Interest, and Sourcing
+
+I got curious about where shootings happen in New York City, who they affect, and whether we can actually predict how deadly one will be. Here we gather and summarize data related to shooting incidents recorded across multiple different boroughs in New York. This was sourced from the US goverments datasets.
+
+First, I mapped out incidents by borough and found Brooklyn and the Bronx account for the vast majority of cases, with a sharp spike around 2020.
+
+How are shootings distributed across boroughs? 
+```{r tidy-transform}
+nypd_data = nypd_data %>%
+  mutate(OCCUR_DATE = mdy(OCCUR_DATE),
+         OCCUR_TIME = as.character(OCCUR_TIME),
+         BORO = as.factor(BORO),
+         PERP_SEX = as.factor(PERP_SEX),
+         VIC_SEX = as.factor(VIC_SEX),
+         PERP_RACE = as.factor(PERP_RACE),
+         VIC_RACE = as.factor(VIC_RACE)) %>%
+  select(-c(X_COORD_CD,Y_COORD_CD,Lon_Lat,Latitude,Longitude))
+summary(nypd_data)
+```
+Note that some columns contain missing values. There can be many reasons for this, since many incidents remained unsolved and in some cases, the perpetrator hasn't been identified. I will leave them as missing since dropping or manipulating incidents would bias the entire datasets; for example, by only showing solved cases with identified perpetrators. This would be detrimental to the integrity of our datasets. Some columns were of course entirely removed at the beginning to clean up the data set if they had no analytical impact on our project.
+
+## Step 3 Visualization and Analysis
+``` {r visualizations}
+ggplot(nypd_data, aes(x=BORO)) + geom_bar(fill="steelblue") + labs(title = "Shooting Incidents by Borough", x="Borough", y="Number of Inicidents")
+ggplot(nypd_data, aes(OCCUR_DATE)) + geom_histogram(binwidth=30, fill = "#D95F02", color = "white") + labs(
+  title = "Shooting Incidents Over Time",
+  x = "Date",
+  y = "Number of Incidents"
+) 
+```       
+Validity of Analysis
+
+The results raised more questions than they answered — some neighborhoods show up far more than others, and that gap deserves scrutiny rather than assumptions. That's the real value here: turning a messy pile of raw numbers into a story people can understand, question, and maybe act on.
+
+The chart clearly shows that the Bronx and Brooklyn have significantly more shootings. There was also a rise in shootings around 2020. 
+
+Cause for Further Investigations
+- why are these two neighborhoods trending in this way: are they more densely populated?
+- could we gather information about relevance of socio-economic trends in each neighborhood?
+- could the 2020 spike be related to the pandemic or was there another factor?
+- is there as significant relationship between the neighborhood and the time of day and the vitim's age, gender or race?
+- does one season of the year see a consistently higher rate of shootings than the other seasons?
+
+## Step 4 Model
+``` {r model}
+stat_murder_model = glm(STATISTICAL_MURDER_FLAG ~ BORO,
+                        data = nypd_data,
+                        family="binomial")
+summary(stat_murder_model)
+```
+This model explores whether the neighborhood where the shooting occured is somehow related to whether or not the crime was classified as a murder specifically.
+
+## Step 5 Identification of Bias
+The Bronx and Brooklyn had the highest shooting rates compared to the other neighborhoods, with Staten Island having the lowest. These rates weren't steady, instead they are consistenly fluctuating and saw a significant spike after 2020.
+
+When considering BIAS, we might note that this only accounts for reported crime and underreporting in certain neighboorhoods might be significant cause for concern. Many cases are also unresolved which might leads us to wonder about how skewed the stats are around the perpetrators. Some neighborhoods are also more densely populated, which is not something the charts take much into account. 
+
+My own personal bias might come into play as well. I don't know much about the neighborhoods outside of what media has represented to me and have no experience in the areas myself. To avoid my own bias, I tried to mitigate some of my own bias by acknowledging preconceived notions from tv and the news of what neighborhoods might be "most dangerous" and tried to draw fair comparisons from the information gathered by relying solely on the data here.
